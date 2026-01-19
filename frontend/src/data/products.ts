@@ -16,7 +16,7 @@ export const products: Product[] = [
     price: 59000,
     thumbnailUrl: "/assets/p001.png",
     badge: "NEW",
-    detailImageUrls: ["/assets/p001_detail_1.jpg", "/assets/p001_detail_2.png","/assets/p001_detail_3.png", "/assets/p001_detail_4.png"],
+    detailImageUrls: ["/assets/p001_detail_1.png", "/assets/p001_detail_2.png","/assets/p001_detail_3.png", "/assets/p001_detail_4.png"],
   },
   {
     id: "p002",
