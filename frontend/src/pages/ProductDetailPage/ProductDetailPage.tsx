@@ -6,11 +6,12 @@ import { RecommendationRow } from "../../components/product/RecommendationRow";
 import { getAlsoViewed, getRecommended } from "../../lib/recommend";
 import { products } from "../../data/products";
 import { formatKRW } from "../../lib/format";
-import { runOcr } from "../../lib/api";
+import { runOcr, translateOcr } from "../../lib/api";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 type TabKey = "detail" | "translation" | "ocr";
+type PriceView = "KRW" | "USD";
 
 export default function ProductDetailPage() {
   const navigate = useNavigate();
@@ -18,7 +19,6 @@ export default function ProductDetailPage() {
 
   const product = useMemo(() => products.find((p) => p.id === id), [id]);
 
-  // ✅ product가 없으면 여기서 종료 (아래 state들이 product를 쓰기 때문에 반드시 먼저 처리)
   if (!product) {
     return (
       <div className="min-h-dvh bg-white">
@@ -39,7 +39,38 @@ export default function ProductDetailPage() {
   }
 
   // ===== UI state =====
+  
   const [tab, setTab] = useState<TabKey>("detail");
+
+  // 가격 토글 state
+  const [priceView, setPriceView] = useState<PriceView>("USD");
+
+  // 임시 환율(대충 느낌용). 나중에 API로 교체
+  const FX_KRW_PER_USD = 1350;
+
+  // 애니메이션 트리거용 (키 변경)
+  const [priceAnimKey, setPriceAnimKey] = useState(0);
+
+  const usdValue = useMemo(() => product.price / FX_KRW_PER_USD, [product.price]);
+  const approxKrwFromUsd = useMemo(
+    () => Math.round(usdValue * FX_KRW_PER_USD),
+    [usdValue]
+  );
+
+  const mainPriceText = useMemo(() => {
+    if (priceView === "KRW") return `${formatKRW(product.price)} KRW`;
+    return `$${usdValue.toFixed(2)} USD`; 
+  }, [priceView, product.price, usdValue]);
+
+  const subPriceText = useMemo(() => {
+    if (priceView !== "USD") return "";
+    return `~${formatKRW(approxKrwFromUsd)} (환율기준)`;
+  }, [priceView, approxKrwFromUsd]);
+
+  function togglePriceView() {
+    setPriceView((v) => (v === "KRW" ? "USD" : "KRW"));
+    setPriceAnimKey((k) => k + 1);
+  }
 
   // OCR 관련 state
   const [selectedDetailUrl, setSelectedDetailUrl] = useState<string>(
@@ -50,16 +81,17 @@ export default function ProductDetailPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string>("");
 
-  // Translation 더미 (다음 단계에서 OCR 결과 기반으로 생성하도록 교체 예정)
-  const [translation] = useState({
-    summary_3: [
-      "English summary will appear here.",
-      "Next step: generate it from OCR text.",
-      "We'll make it global-commerce ready.",
-    ],
-    bullets_5: ["Feature 1", "Feature 2", "Feature 3", "Feature 4", "Feature 5"],
-    care: "Care note will appear here.",
-  });
+  const [trLoading, setTrLoading] = useState(false);
+  const [trError, setTrError] = useState("");
+  const [translation, setTranslation] = useState<null | {
+    title: string;
+    short_description: string;
+    highlights: string[];
+    color: string;
+    size: string;
+    care: string;
+    full_description: string;
+  }>(null);
 
   async function handleRunOcr() {
     try {
@@ -82,6 +114,35 @@ export default function ProductDetailPage() {
       setOcrError(msg);
     } finally {
       setOcrLoading(false);
+    }
+  }
+
+  async function handleGenerateTranslation() {
+    try {
+      setTrError("");
+      setTrLoading(true);
+
+      let sourceText = ocrText;
+
+      // OCR 안 되어 있으면 자동 실행
+      if (!sourceText) {
+        const absoluteUrl = selectedDetailUrl.startsWith("http")
+          ? selectedDetailUrl
+          : `${window.location.origin}${selectedDetailUrl}`;
+
+        const ocrRes = await runOcr(absoluteUrl);
+        setOcrText(ocrRes.text);
+        setOcrLines(ocrRes.lines);
+        sourceText = ocrRes.text;
+      }
+
+      const tr = await translateOcr(sourceText);
+      setTranslation(tr);
+      setTab("translation");
+    } catch (e) {
+      setTrError(e instanceof Error ? e.message : "Failed to generate translation");
+    } finally {
+      setTrLoading(false);
     }
   }
 
@@ -113,9 +174,31 @@ export default function ProductDetailPage() {
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
                 {product.name}
               </h1>
-              <div className="mt-3 text-lg font-semibold">
-                {formatKRW(product.price)} KRW
-              </div>
+              <button
+                type="button"
+                onClick={togglePriceView}
+                className="mt-3 inline-flex items-baseline gap-2 text-left"
+                aria-label="Toggle currency"
+                title="Click to toggle KRW / USD"
+              >
+                {/* 숫자만 애니메이션: key 바뀔 때마다 재마운트되어 entry 애니메이션 */}
+                <span
+                  key={`${priceView}-${priceAnimKey}`}
+                  className={[
+                    "text-lg font-semibold text-neutral-900",
+                    "motion-safe:animate-[priceIn_180ms_ease-out]",
+                  ].join(" ")}
+                >
+                  {mainPriceText}
+                </span>
+                <span className="text-xs font-semibold text-neutral-500">↔</span>
+                {/* USD일 때만 보조표기 */}
+                {priceView === "USD" && (
+                  <span className="text-xs font-semibold text-neutral-500">
+                    {subPriceText}
+                  </span>
+                )}
+              </button>
 
               {/* 옵션 UI (MVP: 동작은 나중에) */}
               <div className="mt-6 space-y-3">
@@ -156,7 +239,7 @@ export default function ProductDetailPage() {
                   className="inline-flex items-center justify-center rounded-full border border-neutral-200 px-5 py-3 text-sm font-semibold hover:bg-neutral-50"
                   onClick={() => setTab("translation")}
                 >
-                  View Global Translation (Soon)
+                  View Global Translation
                 </button>
               </div>
             </div>
@@ -169,7 +252,7 @@ export default function ProductDetailPage() {
             {/* DETAIL */}
             {tab === "detail" && (
               <div className="mt-6">
-                {/* ✅ OCR 대상 이미지 선택 + Run OCR */}
+                {/* OCR 대상 이미지 선택 + Run OCR */}
                 <div className="mb-4 rounded-xl border border-neutral-200 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -224,7 +307,7 @@ export default function ProductDetailPage() {
                 {/* 상세 이미지 접기/펼치기 */}
                 <DetailSection imageUrls={product.detailImageUrls} collapsedHeight={720} />
 
-                {/* ✅ 디테일 아래 추천 */}
+                {/* 디테일 아래 추천 */}
                 <div className="mt-6">
                   <RecommendationRow
                     title="You May Also Like"
@@ -242,60 +325,84 @@ export default function ProductDetailPage() {
             {tab === "translation" && (
               <div className="mt-6 space-y-6">
                 <div className="rounded-xl border border-neutral-200 p-5">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-bold">English Summary</div>
+                      <div className="text-sm font-bold">Global Product Detail (EN)</div>
                       <div className="mt-1 text-xs text-neutral-600">
-                        Next step: generate from OCR text
+                        Generated from image-based OCR using Gemini
                       </div>
                     </div>
 
                     <button
-                      type="button"
-                      onClick={handleRunOcr}
-                      disabled={ocrLoading}
-                      className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold hover:bg-neutral-50 disabled:opacity-60"
-                      title="Run OCR first"
+                      onClick={handleGenerateTranslation}
+                      disabled={trLoading}
+                      className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                     >
-                      {ocrLoading ? "Running..." : "Run OCR"}
+                      {trLoading ? "Generating..." : "Generate"}
                     </button>
                   </div>
 
-                  {ocrError && (
+                  {trError && (
                     <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {ocrError}
+                      {trError}
                     </div>
                   )}
 
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-neutral-800">
-                    {translation.summary_3.map((s) => (
-                      <li key={s}>{s}</li>
-                    ))}
-                  </ul>
+                  {!translation ? (
+                    <div className="mt-4 text-sm text-neutral-600">
+                      Click <b>Generate</b> to create a global-ready product description.
+                    </div>
+                  ) : (
+                    <div className="mt-6 space-y-6">
+                      <div>
+                        <h2 className="text-lg font-bold">{translation.title}</h2>
+                        <p className="mt-2 text-sm text-neutral-700">
+                          {translation.short_description}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-neutral-50 p-4">
+                        <div className="text-sm font-bold">Key Highlights</div>
+                        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm">
+                          {translation.highlights.map((h) => (
+                            <li key={h}>{h}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-lg border p-4">
+                          <div className="text-sm font-bold">Color</div>
+                          <div className="mt-1 text-sm">{translation.color || "-"}</div>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                          <div className="text-sm font-bold">Size</div>
+                          <div className="mt-1 text-sm">{translation.size || "-"}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border p-4">
+                        <div className="text-sm font-bold">Care Instructions</div>
+                        <p className="mt-2 text-sm">{translation.care || "-"}</p>
+                      </div>
+
+                      <div className="rounded-lg border p-4">
+                        <div className="text-sm font-bold">Description</div>
+                        <p className="mt-2 text-sm">{translation.full_description}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-neutral-200 p-5">
-                  <div className="text-sm font-bold">Key Features</div>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-neutral-800">
-                    {translation.bullets_5.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="rounded-xl border border-neutral-200 p-5">
-                  <div className="text-sm font-bold">Care Note</div>
-                  <p className="mt-3 text-sm text-neutral-800">{translation.care}</p>
-                </div>
-
-                <div className="rounded-xl border border-neutral-200 p-5">
-                  <div className="text-sm font-bold">OCR Source Preview</div>
-                  <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm text-neutral-800">
-                    {ocrText || (ocrLines.length ? ocrLines.join("\n") : "Run OCR to see raw text.")}
+                  <div className="text-sm font-bold">OCR Source</div>
+                  <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">
+                    {ocrText || ocrLines.join("\n") || "No OCR result yet."}
                   </pre>
                 </div>
               </div>
             )}
+
 
             {/* OCR RAW */}
             {tab === "ocr" && (
