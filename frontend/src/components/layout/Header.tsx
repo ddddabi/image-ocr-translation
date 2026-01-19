@@ -1,4 +1,5 @@
 import { Container } from "./Container";
+import { IoBagHandleOutline, IoPersonOutline, IoSearch } from "react-icons/io5";
 
 export function Header() {
   return (
@@ -21,13 +22,13 @@ export function Header() {
 
           <div className="ml-auto flex items-center gap-3 md:ml-0">
             <button className="rounded-full p-2 hover:bg-neutral-100" aria-label="Search">
-              ⌕
+              <IoSearch/>
             </button>
             <button className="rounded-full p-2 hover:bg-neutral-100" aria-label="Account">
-              👤
+              <IoPersonOutline/>
             </button>
             <button className="rounded-full p-2 hover:bg-neutral-100" aria-label="Cart">
-              🛍️
+              <IoBagHandleOutline />
             </button>
           </div>
         </div>

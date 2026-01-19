@@ -5,6 +5,7 @@ export type Product = {
   price: number;
   thumbnailUrl: string;
   badge?: "NEW" | "SALE";
+  detailImageUrls: string[];
 };
 
 export const products: Product[] = [
@@ -15,6 +16,7 @@ export const products: Product[] = [
     price: 59000,
     thumbnailUrl: "/assets/p001.png",
     badge: "NEW",
+    detailImageUrls: ["/assets/p001_detail_1.jpg", "/assets/p001_detail_2.png","/assets/p001_detail_3.png", "/assets/p001_detail_4.png"],
   },
   {
     id: "p002",
@@ -22,6 +24,7 @@ export const products: Product[] = [
     name: "[3-PACK] BASIC TRAVELER PIGMENT SWEATSHIRT",
     price: 29900,
     thumbnailUrl: "/assets/p002.png",
+    detailImageUrls: ["/assets/p002_detail_1.png"],
   },
   {
     id: "p003",
@@ -30,6 +33,7 @@ export const products: Product[] = [
     price: 189000,
     thumbnailUrl: "/assets/p003.png",
     badge: "SALE",
+    detailImageUrls: ["/assets/p003_detail_1.png","/assets/p003_detail_2.png"],
   },
   {
     id: "p004",
@@ -37,5 +41,6 @@ export const products: Product[] = [
     name: "SINGLE PLEATED WIDE SWEATPANTS GRAY",
     price: 49000,
     thumbnailUrl: "/assets/p004.png",
+    detailImageUrls: ["/assets/p004_detail_1.png","/assets/p004_detail_2.png"],
   },
 ];

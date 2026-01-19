@@ -1,19 +1,20 @@
 import type { Product } from "../../data/products";
 import { formatKRW } from "../../lib/format";
+import { useNavigate } from "react-router-dom";
 
-type Props = {
-  product: Product;
-  onClick?: () => void;
-};
+type Props = { product: Product };
 
-export function ProductCard({ product, onClick }: Props) {
+export function ProductCard({ product }: Props) {
+  const navigate = useNavigate();
+
   return (
     <button
-      onClick={onClick}
       className="group text-left"
       type="button"
-      aria-label={`Open ${product.name}`}
+      aria-label={product.name}
+      onClick={() => navigate(`/products/${product.id}`)}
     >
+      {/* ... 기존 그대로 ... */}
       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-neutral-100">
         {product.badge && (
           <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-xs font-semibold text-neutral-900">
