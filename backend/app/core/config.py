@@ -8,5 +8,6 @@ class Settings(BaseModel):
     CLOVA_OCR_SECRET: str = os.getenv("CLOVA_OCR_SECRET", "")
     CLOVA_OCR_INVOKE_URL: str = os.getenv("CLOVA_OCR_INVOKE_URL", "")
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5174")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
 settings = Settings()
